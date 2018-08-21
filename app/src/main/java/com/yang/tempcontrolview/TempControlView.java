@@ -1,6 +1,7 @@
 package com.yang.tempcontrolview;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -20,58 +21,59 @@ import android.view.View;
  */
 public class TempControlView extends View {
 
-    // 控件宽
+    /** 控件宽 */
     private int width;
-    // 控件高
+    /** 控件高 */
     private int height;
-    // 刻度盘半径
+    /** 刻度盘半径 */
     private int dialRadius;
-    // 圆弧半径
+    /** 圆弧半径 */
     private int arcRadius;
-    // 刻度高
+    /** 刻度高 */
     private int scaleHeight = dp2px(10);
-    // 刻度盘画笔
+    /** 刻度盘画笔 */
     private Paint dialPaint;
-    // 圆弧画笔
+    /** 圆弧画笔 */
     private Paint arcPaint;
-    // 标题画笔
+    /** 标题画笔 */
     private Paint titlePaint;
-    // 温度标识画笔
+    /** 温度标识画笔 */
     private Paint tempFlagPaint;
-    // 旋转按钮画笔
+    /** 旋转按钮画笔 */
     private Paint buttonPaint;
-    // 温度显示画笔
+    /** 温度显示画笔 */
     private Paint tempPaint;
-    // 文本提示
+    /** 文本提示 */
     private String title = "最高温度设置";
-    // 温度
-    private int temperature = 15;
-    // 最低温度
-    private int minTemp = 15;
-    // 最高温度
-    private int maxTemp = 30;
-    // 四格代表温度1度
+    /** 选中的温度 */
+    private int temperature = 16;
+    /** 最低温度 */
+    private int minTemp = 16;
+    /** 最高温度 */
+    private int maxTemp = 37;
+    /** 1度的格数（默认四格） */
     private int angleRate = 4;
-    // 每格的角度
+    /** 每格的角度 */
     private float angleOne = (float) 270 / (maxTemp - minTemp) / angleRate;
-    // 按钮图片
-    private Bitmap buttonImage = BitmapFactory.decodeResource(getResources(),
-            R.mipmap.btn_rotate);
-    // 按钮图片阴影
-    private Bitmap buttonImageShadow = BitmapFactory.decodeResource(getResources(),
-            R.mipmap.btn_rotate_shadow);
-    // 抗锯齿
+    /** 按钮图片 */
+    private Bitmap buttonImage = BitmapFactory.decodeResource(getResources(), R.mipmap.btn_rotate);
+    /** 按钮图片阴影 */
+    private Bitmap buttonImageShadow = BitmapFactory.decodeResource(getResources(), R.mipmap.btn_rotate_shadow);
+    /** 抗锯齿 */
     private PaintFlagsDrawFilter paintFlagsDrawFilter;
-    // 温度改变监听
+    /** 温度改变监听 */
     private OnTempChangeListener onTempChangeListener;
-    // 控件点击监听
+    /** 控件点击监听 */
     private OnClickListener onClickListener;
+    /** 手指是否按下 */
+    private boolean isDown;
+    /** 手指是否移动 */
+    private boolean isMove;
 
     // 以下为旋转按钮相关
-
-    // 当前按钮旋转的角度
+    /** 当前按钮旋转的角度 */
     private float rotateAngle;
-    // 当前的角度
+    /** 当前的角度 */
     private float currentAngle;
 
     public TempControlView(Context context) {
@@ -82,11 +84,39 @@ public class TempControlView extends View {
         this(context, attrs, 0);
     }
 
+    /**
+     * 构造方法
+     *
+     * @param context
+     * @param attrs
+     * @param defStyleAttr
+     */
+    /** 自定义的颜色 */
+    private int mColor;
     public TempControlView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+
+        //@hehongdan init可变部分定义这样（颜色、大小、刻度值等）
+        TypedArray array = context.getTheme().obtainStyledAttributes(attrs, R.styleable.TempControlView,defStyleAttr,0);
+        int count = array.getIndexCount();
+        for (int i = 0; i < count; i++) {
+            int attr = array.getIndex(i);
+            switch (attr) {
+                case R.styleable.TempControlView_mColor:
+                    mColor = array.getColor(attr, Color.WHITE);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
         init();
     }
 
+    /**
+     * 初始化
+     */
     private void init() {
         dialPaint = new Paint();
         dialPaint.setAntiAlias(true);
@@ -113,6 +143,7 @@ public class TempControlView extends View {
 
         buttonPaint = new Paint();
         tempFlagPaint.setAntiAlias(true);
+        //给canvas加抗锯齿
         paintFlagsDrawFilter = new PaintFlagsDrawFilter(0, Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
 
         tempPaint = new Paint();
@@ -122,10 +153,18 @@ public class TempControlView extends View {
         tempPaint.setStyle(Paint.Style.STROKE);
     }
 
+    /**
+     * 大小发生改变时调用（初始化时调用一次）
+     *
+     * @param w     现在宽度
+     * @param h     现在高度
+     * @param oldw  之前宽度
+     * @param oldh  之前高度
+     */
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        // 控件宽、高
+        // 控件宽、高（最小）
         width = height = Math.min(h, w);
         // 刻度盘半径
         dialRadius = width / 2 - dp2px(20);
@@ -243,15 +282,11 @@ public class TempControlView extends View {
     private void drawTemp(Canvas canvas) {
         canvas.save();
         canvas.translate(getWidth() / 2, getHeight() / 2);
-
         float tempWidth = tempPaint.measureText(temperature + "");
         float tempHeight = (tempPaint.ascent() + tempPaint.descent()) / 2;
         canvas.drawText(temperature + "°", -tempWidth / 2 - dp2px(5), -tempHeight, tempPaint);
         canvas.restore();
     }
-
-    private boolean isDown;
-    private boolean isMove;
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -286,8 +321,11 @@ public class TempControlView extends View {
                 invalidate();
                 break;
 
+                //手指移动到当前控件的外面
             case MotionEvent.ACTION_CANCEL:
-            case MotionEvent.ACTION_UP: {
+                break;
+
+            case MotionEvent.ACTION_UP:
                 if (isDown) {
                     if (isMove) {
                         // 纠正指针位置
@@ -307,7 +345,9 @@ public class TempControlView extends View {
                     isDown = false;
                 }
                 break;
-            }
+
+            default:
+                break;
         }
         return true;
     }
@@ -448,13 +488,61 @@ public class TempControlView extends View {
         void onClick(int temp);
     }
 
+
+    /**
+     * dp转像素
+     *
+     * @param dp
+     * @return
+     */
     public int dp2px(float dp) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp,
                 getResources().getDisplayMetrics());
     }
 
+    /**
+     * sp转像素
+     *
+     * @param sp
+     * @return
+     */
     private int sp2px(float sp) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp,
                 getResources().getDisplayMetrics());
     }
+
+    /**
+     * in转像素
+     *
+     * @param in
+     * @return
+     */
+    private int in2px(float in) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_IN, in,
+                getResources().getDisplayMetrics());
+    }
+
+    /**
+     * mm转像素
+     *
+     * @param mm
+     * @return
+     */
+    private int mm2px(float mm) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_MM, mm,
+                getResources().getDisplayMetrics());
+    }
+
+    /**
+     * pt转像素
+     *
+     * @param pt
+     * @return
+     */
+    private int pt2px(float pt) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_PT, pt,
+                getResources().getDisplayMetrics());
+    }
+
+
 }
