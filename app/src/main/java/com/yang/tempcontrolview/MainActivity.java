@@ -4,6 +4,8 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.Toast;
 
+import com.hehongdan.view.TempControlView;
+
 /**
  * 主页
  * Created by yangle on 2016/11/19.

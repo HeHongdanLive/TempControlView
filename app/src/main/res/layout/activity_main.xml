@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:background="#ECF4F9">
 
-    <com.yang.tempcontrolview.TempControlView
+    <com.hehongdan.view.TempControlView
         android:id="@+id/temp_control"
         android:layout_width="260dp"
         android:layout_height="260dp"
